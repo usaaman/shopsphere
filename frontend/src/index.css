@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #264E3B;
+  --color-secondary: #8FAE8B;
+  --color-accent: #D8C3A5;
+  --color-ivory: #FAF8F4;
+  --color-success: #3FA76C;
+  --color-error: #E24A4A;
+  
+  --font-serif: "Playfair Display", serif;
+  --font-sans: "Inter", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-ivory text-[#1D1D1D] font-sans antialiased;
+  }
+}
