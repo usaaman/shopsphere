@@ -1,18 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import ProductCard from '../components/ProductCard';
+import ProductSkeleton from '../components/ProductSkeleton';
+import FilterDrawer from '../components/FilterDrawer';
+import QuickViewModal from '../components/QuickViewModal';
 import api from '../api/api';
 
 const Shop = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Filter States
+  // Search experience states
   const [keyword, setKeyword] = useState(searchParams.get('keyword') || '');
+  const [searchHistory, setSearchHistory] = useState(() => {
+    const history = localStorage.getItem('searchHistory');
+    return history ? JSON.parse(history) : [];
+  });
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Filter States
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'All');
   const [minPrice, setMinPrice] = useState(searchParams.get('minPrice') || '');
   const [maxPrice, setMaxPrice] = useState(searchParams.get('maxPrice') || '');
   const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'newest');
+  const [ratingFilter, setRatingFilter] = useState(Number(searchParams.get('rating')) || 0);
+  const [inStockOnly, setInStockOnly] = useState(searchParams.get('inStock') === 'true');
   const [page, setPage] = useState(Number(searchParams.get('pageNumber')) || 1);
 
   // Data states
@@ -21,8 +33,12 @@ const Shop = () => {
   const [pages, setPages] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
+  // Modals / Drawers toggles
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [quickViewProduct, setQuickViewProduct] = useState(null);
+
+  // Fetch Categories
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -35,6 +51,25 @@ const Shop = () => {
     fetchCategories();
   }, []);
 
+  // Live Suggestions Handler
+  useEffect(() => {
+    if (!keyword.trim()) {
+      setSuggestions([]);
+      return;
+    }
+
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const { data } = await api.get('/products', { params: { keyword: keyword.trim(), pageSize: 5 } });
+        setSuggestions(data.products || []);
+      } catch (err) {
+        console.error('Error fetching suggestions:', err);
+      }
+    }, 200);
+
+    return () => clearTimeout(delayDebounce);
+  }, [keyword]);
+
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -44,6 +79,8 @@ const Shop = () => {
       if (minPrice) params.minPrice = minPrice;
       if (maxPrice) params.maxPrice = maxPrice;
       if (sortBy) params.sortBy = sortBy;
+      if (ratingFilter) params.rating = ratingFilter;
+      if (inStockOnly) params.inStock = 'true';
       params.pageNumber = page;
 
       const { data } = await api.get('/products', { params });
@@ -64,15 +101,24 @@ const Shop = () => {
     if (minPrice) urlParams.minPrice = minPrice;
     if (maxPrice) urlParams.maxPrice = maxPrice;
     if (sortBy) urlParams.sortBy = sortBy;
+    if (ratingFilter) urlParams.rating = ratingFilter;
+    if (inStockOnly) urlParams.inStock = 'true';
     urlParams.pageNumber = page;
 
     setSearchParams(urlParams);
     fetchProducts();
-  }, [selectedCategory, minPrice, maxPrice, sortBy, page, setSearchParams]);
+  }, [selectedCategory, minPrice, maxPrice, sortBy, ratingFilter, inStockOnly, page, setSearchParams]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
+    if (keyword.trim()) {
+      // Save to history
+      const updatedHistory = [keyword.trim(), ...searchHistory.filter((h) => h !== keyword.trim())].slice(0, 5);
+      setSearchHistory(updatedHistory);
+      localStorage.setItem('searchHistory', JSON.stringify(updatedHistory));
+    }
     setPage(1);
+    setShowSuggestions(false);
     fetchProducts();
   };
 
@@ -82,341 +128,249 @@ const Shop = () => {
     setMinPrice('');
     setMaxPrice('');
     setSortBy('newest');
+    setRatingFilter(0);
+    setInStockOnly(false);
     setPage(1);
   };
 
-  const categoriesList = ['All', ...categories.map((c) => c.name)];
-
   return (
-    <div className="max-w-7xl mx-auto px-6 py-12">
-      {/* Header Info */}
-      <div className="flex flex-col sm:flex-row justify-between sm:items-end gap-4 mb-10 pb-6 border-b border-[#ECECEC]">
-        <div>
-          <span className="text-[10px] text-secondary font-bold uppercase tracking-widest">Verdora Catalog</span>
-          <h1 className="text-3xl font-serif font-bold text-primary mt-1">Shop Collections</h1>
-          <p className="text-xs text-gray-500 font-light mt-1">Showing {totalProducts} curated products</p>
-        </div>
-
-        {/* Desktop Sorting */}
-        <div className="hidden sm:flex items-center gap-3">
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sort By</label>
-          <select
-            value={sortBy}
-            onChange={(e) => {
-              setSortBy(e.target.value);
-              setPage(1);
-            }}
-            className="border border-[#ECECEC] text-xs font-semibold text-gray-700 bg-white rounded-full px-4 py-2 focus:outline-none focus:border-primary"
-          >
-            <option value="newest">Newest Arrivals</option>
-            <option value="priceAsc">Price: Low to High</option>
-            <option value="priceDesc">Price: High to Low</option>
-            <option value="topRated">Top Rated</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
-        {/* DESKTOP SIDEBAR FILTERS */}
-        <div className="hidden lg:flex flex-col gap-8 p-6 bg-white border border-[#ECECEC] rounded-3xl h-fit shadow-sm">
-          <div className="flex justify-between items-center pb-3 border-b border-[#ECECEC]">
-            <h3 className="font-serif font-bold text-primary text-base">Filter By</h3>
-            <button onClick={handleResetFilters} className="text-[10px] font-bold uppercase tracking-widest text-[#E24A4A] hover:underline">
-              Clear All
-            </button>
-          </div>
-
-          {/* Keyword Search */}
-          <form onSubmit={handleSearchSubmit} className="flex flex-col gap-2">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Search</label>
-            <div className="relative">
+    <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col gap-8">
+      {/* 1. STICKY TOP SEARCH BAR & CATEGORY PILLS */}
+      <div className="flex flex-col gap-5 sticky top-16 z-20 bg-bg-soft/90 backdrop-blur pb-4 pt-2">
+        <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+          
+          {/* Top Search with suggestions dropdown */}
+          <div className="relative w-full max-w-lg flex flex-col">
+            <form onSubmit={handleSearchSubmit} className="relative w-full flex items-center">
               <input
                 type="text"
-                placeholder="Product name..."
+                placeholder="Search products..."
                 value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                className="w-full bg-[#FAF8F4] border border-[#ECECEC] rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-primary focus:bg-white"
+                onChange={(e) => {
+                  setKeyword(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                className="w-full bg-white border border-border-light rounded-full py-3.5 pl-5 pr-12 text-xs focus:outline-none focus:border-primary-start focus:bg-white shadow-sm transition-all"
               />
               {keyword && (
                 <button
                   type="button"
-                  onClick={() => setKeyword('')}
-                  className="absolute right-3 top-2.5 text-gray-400 text-xs"
+                  onClick={() => {
+                    setKeyword('');
+                    setSuggestions([]);
+                  }}
+                  className="absolute right-12 text-text-secondary text-xs hover:text-text-primary p-1"
                 >
                   ✕
                 </button>
               )}
-            </div>
-          </form>
-
-          {/* Categories list */}
-          <div className="flex flex-col gap-2">
-            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Categories</h4>
-            <div className="flex flex-col gap-1.5 mt-1">
-              {categoriesList.map((cat, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setSelectedCategory(cat);
-                    setPage(1);
-                  }}
-                  className={`text-left text-xs py-2 px-3 rounded-xl font-semibold transition-colors duration-150 ${
-                    selectedCategory === cat
-                      ? 'bg-primary text-white'
-                      : 'text-gray-600 hover:bg-[#FAF8F4] hover:text-primary'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Price Boundaries */}
-          <div className="flex flex-col gap-2">
-            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Price Limit ($)</h4>
-            <div className="flex items-center gap-2 mt-1">
-              <input
-                type="number"
-                placeholder="Min"
-                value={minPrice}
-                onChange={(e) => {
-                  setMinPrice(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full bg-[#FAF8F4] border border-[#ECECEC] rounded-xl p-2.5 text-xs focus:outline-none focus:bg-white"
-              />
-              <span className="text-gray-300 text-xs">&ndash;</span>
-              <input
-                type="number"
-                placeholder="Max"
-                value={maxPrice}
-                onChange={(e) => {
-                  setMaxPrice(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full bg-[#FAF8F4] border border-[#ECECEC] rounded-xl p-2.5 text-xs focus:outline-none focus:bg-white"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* MOBILE FILTER SWITCHERS */}
-        <div className="lg:hidden flex items-center justify-between gap-4 w-full">
-          <button
-            onClick={() => setMobileFiltersOpen(true)}
-            className="flex items-center gap-2 bg-white border border-[#ECECEC] px-5 py-2.5 rounded-full text-xs font-semibold text-gray-700 shadow-sm"
-          >
-            Filters
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
-            </svg>
-          </button>
-
-          <select
-            value={sortBy}
-            onChange={(e) => {
-              setSortBy(e.target.value);
-              setPage(1);
-            }}
-            className="border border-[#ECECEC] text-xs font-semibold text-gray-700 bg-white rounded-full px-4 py-2.5 focus:outline-none shadow-sm"
-          >
-            <option value="newest">Newest Arrivals</option>
-            <option value="priceAsc">Price: Low to High</option>
-            <option value="priceDesc">Price: High to Low</option>
-            <option value="topRated">Top Rated</option>
-          </select>
-        </div>
-
-        {/* PRODUCT LIST GRID */}
-        <div className="lg:col-span-3 flex flex-col gap-10">
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-              {Array.from({ length: 6 }).map((_, idx) => (
-                <div key={idx} className="bg-white aspect-[4/5] rounded-3xl animate-pulse border border-[#ECECEC]/30" />
-              ))}
-            </div>
-          ) : products.length === 0 ? (
-            <div className="text-center py-16 bg-white border border-[#ECECEC]/60 rounded-3xl max-w-md mx-auto w-full shadow-sm">
-              <span className="text-4xl">🔍</span>
-              <h2 className="font-serif font-bold text-primary mt-4 mb-2 text-lg">No products found</h2>
-              <p className="text-xs text-gray-500 mb-6 px-6 font-light leading-relaxed">
-                We couldn't find any products matching your active filters. Try adjusting your keyword search or pricing criteria.
-              </p>
-              <button
-                onClick={handleResetFilters}
-                className="bg-primary text-white text-xs font-bold uppercase tracking-wider px-6 py-2.5 rounded-full shadow-sm hover:bg-primary/95"
-              >
-                Reset Filters
+              <button type="submit" className="absolute right-4 text-text-secondary hover:text-primary-start">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.637 10.637Z" />
+                </svg>
               </button>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                {products.map((product) => (
-                  <ProductCard key={product._id} product={product} />
-                ))}
-              </div>
+            </form>
 
-              {/* Pagination Controls */}
-              {pages > 1 && (
-                <div className="flex justify-center items-center gap-2.5 mt-6 border-t border-[#ECECEC]/40 pt-8">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="w-9 h-9 rounded-xl border border-[#ECECEC] flex items-center justify-center text-sm font-semibold hover:bg-white transition disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    &larr;
-                  </button>
-                  {Array.from({ length: pages }).map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setPage(idx + 1)}
-                      className={`w-9 h-9 rounded-xl font-bold text-xs transition ${
-                        page === idx + 1
-                          ? 'bg-primary text-white shadow-sm'
-                          : 'border border-[#ECECEC] bg-white hover:bg-gray-50 text-gray-700'
-                      }`}
-                    >
-                      {idx + 1}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => setPage((p) => Math.min(pages, p + 1))}
-                    disabled={page === pages}
-                    className="w-9 h-9 rounded-xl border border-[#ECECEC] flex items-center justify-center text-sm font-semibold hover:bg-white transition disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    &rarr;
-                  </button>
+            {/* Suggestions Dropdown */}
+            {showSuggestions && (keyword.trim() || searchHistory.length > 0) && (
+              <div className="absolute top-[52px] left-0 right-0 bg-white border border-border-light rounded-2xl shadow-md p-4 flex flex-col gap-3.5 z-30">
+                <div className="flex justify-between items-center pb-2 border-b border-border-light">
+                  <span className="text-[9px] font-bold text-text-secondary uppercase tracking-widest">Suggestions</span>
+                  <button onClick={() => setShowSuggestions(false)} className="text-[9px] text-text-secondary hover:text-text-primary font-bold">Close</button>
                 </div>
-              )}
-            </>
-          )}
+
+                {/* Search History */}
+                {searchHistory.length > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[9px] font-bold text-text-secondary uppercase tracking-widest pl-1">Recent Searches</span>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {searchHistory.map((hist, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setKeyword(hist);
+                            setPage(1);
+                            setShowSuggestions(false);
+                          }}
+                          className="bg-bg-soft text-text-secondary hover:text-text-primary px-3 py-1 rounded-full text-xs font-semibold"
+                        >
+                          {hist}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Live Suggestions list */}
+                {keyword.trim() && (
+                  <div className="flex flex-col gap-2 mt-2">
+                    <span className="text-[9px] font-bold text-text-secondary uppercase tracking-widest pl-1">Matching Products</span>
+                    {suggestions.length === 0 ? (
+                      <p className="text-[11px] text-text-secondary font-light pl-1">No matches found</p>
+                    ) : (
+                      suggestions.map((p) => (
+                        <button
+                          key={p._id}
+                          onClick={() => {
+                            setKeyword(p.name);
+                            setPage(1);
+                            setShowSuggestions(false);
+                          }}
+                          className="flex items-center gap-3 text-left w-full hover:bg-bg-soft/50 p-1.5 rounded-xl transition"
+                        >
+                          <img src={p.image} alt={p.name} className="w-8 h-8 object-cover rounded-lg border border-border-light/40" />
+                          <span className="text-[11px] font-semibold text-text-primary truncate flex-grow">{p.name}</span>
+                          <span className="text-[11px] font-bold text-text-primary">${p.price}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Sort & Drawer Toggle */}
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+            <button
+              onClick={() => setFiltersOpen(true)}
+              className="flex items-center gap-2 bg-white border border-border-light px-5 py-3 rounded-full text-xs font-bold text-text-primary shadow-sm hover:shadow-md transition-all"
+            >
+              Filter Options
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="w-3.5 h-3.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+              </svg>
+            </button>
+
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                setPage(1);
+              }}
+              className="border border-border-light text-xs font-bold text-text-primary bg-white rounded-full px-4 py-3 focus:outline-none shadow-sm cursor-pointer"
+            >
+              <option value="newest">Newest Arrivals</option>
+              <option value="priceAsc">Price: Low to High</option>
+              <option value="priceDesc">Price: High to Low</option>
+              <option value="topRated">Top Rated</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Category horizontal scroll bar */}
+        <div className="flex gap-2 overflow-x-auto pb-1 max-w-full scrollbar-none">
+          {['All', ...categories.map((c) => c.name)].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => {
+                setSelectedCategory(cat);
+                setPage(1);
+              }}
+              className={`text-xs py-2.5 px-5 rounded-full font-bold uppercase tracking-wider transition shrink-0 shadow-sm ${
+                selectedCategory === cat
+                  ? 'bg-gradient-to-r from-primary-start to-primary-end text-white'
+                  : 'bg-white text-text-secondary hover:bg-gray-50 border border-border-light'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* MOBILE DRAWER FILTERS PANEL */}
-      <AnimatePresence>
-        {mobileFiltersOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm lg:hidden flex justify-end"
+      {/* 2. RESPONSIVE PRODUCT GRID (4 columns desktop, 3 columns tablet, 2 columns mobile) */}
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 8 }).map((_, idx) => (
+            <ProductSkeleton key={idx} />
+          ))}
+        </div>
+      ) : products.length === 0 ? (
+        <div className="text-center py-20 bg-white border border-border-light rounded-3xl max-w-sm mx-auto w-full shadow-sm">
+          <span className="text-3.5xl">🔍</span>
+          <h2 className="font-bold text-text-primary mt-4 mb-2 text-base">No products matched</h2>
+          <p className="text-xs text-text-secondary mb-6 px-6 font-light leading-relaxed">
+            Adjust price limits or clear filters to look up other products.
+          </p>
+          <button
+            onClick={handleResetFilters}
+            className="bg-gradient-to-r from-primary-start to-primary-end text-white text-xs font-bold uppercase tracking-wider px-6 py-2.5 rounded-full"
           >
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'tween', duration: 0.3 }}
-              className="w-80 max-w-full bg-white h-full p-6 overflow-y-auto flex flex-col gap-6 relative"
+            Clear Filters
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+          {products.map((product) => (
+            <ProductCard
+              key={product._id}
+              product={product}
+              onQuickView={() => setQuickViewProduct(product)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* 3. PAGINATION */}
+      {pages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-6 border-t border-border-light pt-8">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="w-9 h-9 rounded-xl border border-border-light flex items-center justify-center text-sm font-semibold hover:bg-white transition disabled:opacity-30"
+          >
+            &larr;
+          </button>
+          {Array.from({ length: pages }).map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => setPage(idx + 1)}
+              className={`w-9 h-9 rounded-xl font-bold text-xs transition ${
+                page === idx + 1
+                  ? 'bg-gradient-to-r from-primary-start to-primary-end text-white shadow-sm'
+                  : 'border border-border-light bg-white hover:bg-gray-50 text-text-secondary'
+              }`}
             >
-              <div className="flex justify-between items-center pb-3 border-b border-[#ECECEC]">
-                <h3 className="font-serif font-bold text-primary text-lg">Filter Choices</h3>
-                <button
-                  onClick={() => setMobileFiltersOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 text-sm font-bold p-1"
-                >
-                  ✕
-                </button>
-              </div>
+              {idx + 1}
+            </button>
+          ))}
+          <button
+            onClick={() => setPage((p) => Math.min(pages, p + 1))}
+            disabled={page === pages}
+            className="w-9 h-9 rounded-xl border border-border-light flex items-center justify-center text-sm font-semibold hover:bg-white transition disabled:opacity-30"
+          >
+            &rarr;
+          </button>
+        </div>
+      )}
 
-              {/* Keyword */}
-              <form onSubmit={handleSearchSubmit} className="flex flex-col gap-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Search</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search name..."
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    className="w-full bg-[#FAF8F4] border border-[#ECECEC] rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-primary"
-                  />
-                  {keyword && (
-                    <button
-                      type="button"
-                      onClick={() => setKeyword('')}
-                      className="absolute right-2 top-2 text-gray-400 text-xs"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              </form>
+      {/* 4. MODALS & DRAWERS */}
+      <FilterDrawer
+        isOpen={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        categories={categories}
+        selectedCategory={selectedCategory}
+        setSelectedCategory={setSelectedCategory}
+        minPrice={minPrice}
+        setMinPrice={setMinPrice}
+        maxPrice={maxPrice}
+        setMaxPrice={setMaxPrice}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        ratingFilter={ratingFilter}
+        setRatingFilter={setRatingFilter}
+        inStockOnly={inStockOnly}
+        setInStockOnly={setInStockOnly}
+        onReset={handleResetFilters}
+      />
 
-              {/* Categories */}
-              <div className="flex flex-col gap-1.5">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Categories</h4>
-                <div className="flex flex-wrap gap-1.5 mt-1">
-                  {categoriesList.map((cat, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        setSelectedCategory(cat);
-                        setPage(1);
-                      }}
-                      className={`text-xs py-2.5 px-3.5 rounded-xl font-semibold transition ${
-                        selectedCategory === cat
-                          ? 'bg-primary text-white'
-                          : 'bg-[#FAF8F4] text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Pricing */}
-              <div className="flex flex-col gap-1.5">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Price Limit ($)</h4>
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="number"
-                    placeholder="Min"
-                    value={minPrice}
-                    onChange={(e) => {
-                      setMinPrice(e.target.value);
-                      setPage(1);
-                    }}
-                    className="w-full bg-[#FAF8F4] border border-[#ECECEC] rounded-xl p-2.5 text-xs focus:outline-none"
-                  />
-                  <span className="text-gray-400 text-xs">&ndash;</span>
-                  <input
-                    type="number"
-                    placeholder="Max"
-                    value={maxPrice}
-                    onChange={(e) => {
-                      setMaxPrice(e.target.value);
-                      setPage(1);
-                }}
-                    className="w-full bg-[#FAF8F4] border border-[#ECECEC] rounded-xl p-2.5 text-xs focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="mt-auto pt-6 flex gap-3">
-                <button
-                  onClick={() => {
-                    handleResetFilters();
-                    setMobileFiltersOpen(false);
-                  }}
-                  className="flex-1 py-3 text-xs font-bold text-[#E24A4A] bg-red-50 rounded-xl uppercase tracking-wider"
-                >
-                  Clear
-                </button>
-                <button
-                  onClick={() => setMobileFiltersOpen(false)}
-                  className="flex-1 py-3 text-xs font-bold text-white bg-primary rounded-xl uppercase tracking-wider"
-                >
-                  Apply
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <QuickViewModal
+        product={quickViewProduct}
+        isOpen={!!quickViewProduct}
+        onClose={() => setQuickViewProduct(null)}
+      />
     </div>
   );
 };

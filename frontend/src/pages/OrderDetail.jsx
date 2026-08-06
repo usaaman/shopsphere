@@ -2,11 +2,14 @@ import { useState, useEffect, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AuthContext } from '../context/AuthContext';
+import { ToastContext } from '../context/ToastContext';
 import api from '../api/api';
 
 const OrderDetail = () => {
   const { id } = useParams();
   const { user } = useContext(AuthContext);
+  const { showToast } = useContext(ToastContext);
+
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -31,17 +34,18 @@ const OrderDetail = () => {
     setPaying(true);
     try {
       await api.put(`/orders/${id}/pay`);
+      showToast('Payment simulated successfully', 'success');
       fetchOrder();
     } catch (err) {
-      alert(err.response?.data?.message || 'Payment simulation failed');
+      showToast(err.response?.data?.message || 'Payment simulation failed', 'danger');
     } finally {
       setPaying(false);
     }
   };
 
-  if (loading) return <p className="text-center mt-10 text-gray-500 text-sm">Loading order details...</p>;
-  if (error) return <p className="text-center mt-10 text-red-600 text-sm">{error}</p>;
-  if (!order) return <p className="text-center mt-10 text-gray-500 text-sm">Order not found</p>;
+  if (loading) return <p className="text-center mt-10 text-text-secondary text-sm">Loading order details...</p>;
+  if (error) return <p className="text-center mt-10 text-danger text-sm">{error}</p>;
+  if (!order) return <p className="text-center mt-10 text-text-secondary text-sm">Order not found</p>;
 
   // Progress steps
   const steps = [
@@ -52,63 +56,76 @@ const OrderDetail = () => {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
+    <div className="max-w-4xl mx-auto px-6 py-12 print:p-0 print:m-0">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8 print:hidden">
         <div>
-          <Link to="/profile" className="text-xs font-semibold text-primary hover:underline">
-            &larr; Back to profile
+          <Link to="/profile" className="text-xs font-semibold text-primary-start hover:underline">
+            &larr; Back to Profile
           </Link>
-          <h1 className="text-2xl font-serif font-bold text-primary mt-1">Order #{order._id.slice(-6)}</h1>
-          <p className="text-xs text-gray-400 font-light mt-0.5">
+          <h1 className="text-2xl font-bold text-text-primary mt-2">Order #{order._id.slice(-6)}</h1>
+          <p className="text-xs text-text-secondary font-light mt-0.5">
             Placed on {new Date(order.createdAt).toLocaleString()}
           </p>
         </div>
 
-        {/* Payment Simulation button */}
-        {!order.isPaid && order.paymentMethod === 'Card' && (
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={handlePayOrder}
-            disabled={paying}
-            className="bg-primary hover:bg-primary/95 text-white text-xs font-bold uppercase tracking-widest px-6 py-2.5 rounded-full transition disabled:opacity-50"
+        {/* Invoice Actions */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => window.print()}
+            className="border border-border-light bg-white hover:bg-bg-soft text-text-primary text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-full shadow-sm"
           >
-            {paying ? 'Processing...' : 'Simulate Payment'}
-          </motion.button>
-        )}
+            🖨️ Download Invoice
+          </button>
+
+          {!order.isPaid && order.paymentMethod === 'Card' && (
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              onClick={handlePayOrder}
+              disabled={paying}
+              className="bg-gradient-to-r from-primary-start to-primary-end hover:opacity-95 text-white text-xs font-bold uppercase tracking-widest px-6 py-2.5 rounded-full transition disabled:opacity-50 shadow-sm"
+            >
+              {paying ? 'Processing...' : 'Simulate Payment'}
+            </motion.button>
+          )}
+        </div>
+      </div>
+
+      {/* PRINT-ONLY HEADER */}
+      <div className="hidden print:flex flex-col gap-2 pb-6 border-b border-border-light mb-8">
+        <h1 className="text-2xl font-bold text-text-primary">SHOPSPHERE INVOICE</h1>
+        <p className="text-xs text-text-secondary">Order Reference ID: #{order._id}</p>
+        <p className="text-xs text-text-secondary">Receipt Date: {new Date(order.createdAt).toLocaleDateString()}</p>
       </div>
 
       {/* Progress Timeline Tracker */}
-      <div className="bg-white border border-[#ECECEC] p-8 rounded-3xl mb-8 shadow-sm">
-        <h3 className="font-serif font-bold text-primary text-sm mb-6 uppercase tracking-wider">Delivery Progress</h3>
+      <div className="bg-white border border-border-light p-8 rounded-2xl mb-8 shadow-sm print:hidden">
+        <h3 className="font-bold text-text-primary text-xs mb-6 uppercase tracking-wider">Delivery Progress</h3>
         <div className="flex flex-col sm:flex-row justify-between items-center relative gap-6 sm:gap-4">
-          {/* Progress bar line connector */}
-          <div className="hidden sm:block absolute top-[18px] left-[5%] right-[5%] h-0.5 bg-gray-150 -z-10" />
+          <div className="hidden sm:block absolute top-[18px] left-[5%] right-[5%] h-0.5 bg-gray-100 -z-10" />
           <div
-            className="hidden sm:block absolute top-[18px] left-[5%] h-0.5 bg-primary -z-10 transition-all duration-300"
+            className="hidden sm:block absolute top-[18px] left-[5%] h-0.5 bg-gradient-to-r from-primary-start to-primary-end -z-10 transition-all duration-300"
             style={{
-              width: `${
-                order.isDelivered ? '90%' : order.isPaid ? '60%' : '30%'
-              }`,
+              width: `${order.isDelivered ? '90%' : order.isPaid ? '60%' : '30%'
+                }`,
             }}
           />
 
           {steps.map((step, idx) => (
             <div key={idx} className="flex sm:flex-col items-center gap-3 sm:gap-2 flex-grow sm:flex-grow-0 z-10 w-full sm:w-auto">
               <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs border-2 ${
-                  step.active
-                    ? 'bg-primary border-primary text-white shadow-sm'
-                    : 'bg-white border-gray-250 text-gray-400'
-                }`}
+                className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs border-2 ${step.active
+                    ? 'bg-primary-start border-primary-start text-white shadow-sm'
+                    : 'bg-white border-gray-200 text-gray-300'
+                  }`}
               >
                 {step.active ? '✓' : idx + 1}
               </div>
               <div className="text-left sm:text-center">
-                <p className={`text-xs font-bold uppercase tracking-wider ${step.active ? 'text-gray-800' : 'text-gray-400'}`}>
+                <p className={`text-[10px] font-bold uppercase tracking-wider ${step.active ? 'text-text-primary' : 'text-gray-400'}`}>
                   {step.label}
                 </p>
                 {step.active && step.date && (
-                  <p className="text-[10px] text-gray-500 mt-0.5 font-light">
+                  <p className="text-[9px] text-text-secondary mt-0.5 font-light">
                     {new Date(step.date).toLocaleDateString()}
                   </p>
                 )}
@@ -118,27 +135,26 @@ const OrderDetail = () => {
         </div>
       </div>
 
-      {/* Item summary / Invoice details */}
+      {/* Item invoice details */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Left column */}
         <div className="md:col-span-2 flex flex-col gap-6">
-          <div className="bg-white border border-[#ECECEC] p-6 rounded-3xl shadow-sm">
-            <h3 className="font-serif font-bold text-primary text-sm mb-4">Items Summary</h3>
+          <div className="bg-white border border-border-light p-6 rounded-2xl shadow-sm">
+            <h3 className="font-bold text-text-primary text-xs mb-4 uppercase tracking-wider">Items Summary</h3>
             <div className="flex flex-col gap-4">
               {order.orderItems.map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center gap-4 py-2 border-b border-[#ECECEC]/30 last:border-b-0">
+                <div key={idx} className="flex justify-between items-center gap-4 py-2 border-b border-border-light last:border-b-0">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-ivory rounded-xl overflow-hidden shrink-0 flex items-center justify-center font-serif text-lg text-secondary">
+                    <div className="w-10 h-10 bg-bg-soft rounded-xl overflow-hidden shrink-0 flex items-center justify-center text-lg">
                       📦
                     </div>
                     <div>
-                      <h4 className="font-serif font-semibold text-gray-800 text-sm line-clamp-1">{item.name}</h4>
-                      <p className="text-xs text-gray-400 font-light mt-0.5">
+                      <h4 className="font-semibold text-text-primary text-xs line-clamp-1">{item.name}</h4>
+                      <p className="text-[10px] text-text-secondary font-light mt-0.5">
                         ${item.price} &times; {item.quantity}
                       </p>
                     </div>
                   </div>
-                  <span className="font-bold text-gray-900 text-sm">
+                  <span className="font-bold text-text-primary text-xs">
                     ${(item.price * item.quantity).toFixed(2)}
                   </span>
                 </div>
@@ -147,43 +163,37 @@ const OrderDetail = () => {
           </div>
 
           {/* Shipping coordinates */}
-          <div className="bg-white border border-[#ECECEC] p-6 rounded-3xl shadow-sm">
-            <h3 className="font-serif font-bold text-primary text-sm mb-3">Shipping Logistics</h3>
-            <p className="text-sm font-bold text-gray-800 mb-1">{order.user?.name}</p>
-            <p className="text-xs text-gray-600 font-light">{order.shippingAddress.address}</p>
-            <p className="text-xs text-gray-600 font-light">
+          <div className="bg-white border border-border-light p-6 rounded-2xl shadow-sm">
+            <h3 className="font-bold text-text-primary text-xs mb-3 uppercase tracking-wider">Shipping Coordinates</h3>
+            <p className="text-xs font-bold text-text-primary mb-1">{order.user?.name}</p>
+            <p className="text-xs text-text-secondary font-light">{order.shippingAddress.address}</p>
+            <p className="text-xs text-text-secondary font-light">
               {order.shippingAddress.city}, {order.shippingAddress.postalCode}
             </p>
-            <p className="text-xs text-gray-600 font-semibold mt-0.5">{order.shippingAddress.country}</p>
+            <p className="text-xs text-text-primary font-semibold mt-0.5">{order.shippingAddress.country}</p>
           </div>
         </div>
 
-        {/* Right column: Invoice summary */}
-        <div className="bg-white border border-[#ECECEC] p-6 rounded-3xl h-fit flex flex-col gap-4 shadow-sm">
-          <h3 className="font-serif font-bold text-primary text-sm border-b border-[#ECECEC] pb-3">Billing Summary</h3>
+        {/* Right Summary */}
+        <div className="bg-white border border-border-light p-6 rounded-2xl h-fit flex flex-col gap-4 shadow-sm">
+          <h3 className="font-bold text-text-primary text-xs border-b border-border-light pb-3 uppercase tracking-wider">Billing Invoice</h3>
 
-          <div className="flex justify-between text-xs text-gray-500">
+          <div className="flex justify-between text-xs text-text-secondary">
             <span>Payment Method</span>
-            <span className="font-semibold text-gray-800">{order.paymentMethod}</span>
+            <span className="font-semibold text-text-primary">{order.paymentMethod}</span>
           </div>
 
-          <div className="flex justify-between text-xs text-gray-500 border-b border-[#ECECEC]/60 pb-3">
-            <span>Payment Status</span>
-            <span className={`font-semibold ${order.isPaid ? 'text-success' : 'text-error'}`}>
+          <div className="flex justify-between text-xs text-text-secondary border-b border-border-light pb-3">
+            <span>Status</span>
+            <span className={`font-semibold ${order.isPaid ? 'text-success' : 'text-danger'}`}>
               {order.isPaid ? 'Paid' : 'Unpaid'}
             </span>
           </div>
 
-          <div className="flex justify-between items-center text-gray-850 font-black text-sm mt-2">
+          <div className="flex justify-between items-center text-text-primary font-black text-sm mt-2">
             <span>Total Cost</span>
-            <span className="text-primary text-lg font-extrabold">${order.totalPrice.toFixed(2)}</span>
+            <span className="text-primary-start text-base font-extrabold">${order.totalPrice.toFixed(2)}</span>
           </div>
-
-          {order.paymentMethod === 'Cash on Delivery' && !order.isPaid && (
-            <p className="text-[10px] text-[#8C7A5F] bg-[#FAF3E7] p-3 rounded-2xl border border-[#FAF3E7]/40 leading-relaxed font-light mt-2">
-              <strong>COD Note:</strong> Settle payment in cash upon shipping receipt. The status updates to Paid after dispatch is confirmed.
-            </p>
-          )}
         </div>
       </div>
     </div>
