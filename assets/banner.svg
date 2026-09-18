@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#080C15" />
+      <stop offset="45%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#090D16" />
+    </linearGradient>
+
+    <!-- Accent Gradients -->
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1" />
+      <stop offset="50%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#EC4899" />
+    </linearGradient>
+
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06B6D4" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.02" />
+    </linearGradient>
+
+    <!-- Glow Filters -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="30" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="50" result="blur" />
+    </filter>
+
+    <!-- Grid Pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#334155" stroke-width="1" stroke-opacity="0.25" />
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="420" fill="url(#bgGrad)" />
+
+  <!-- Ambient Glowing Orbs -->
+  <circle cx="200" cy="100" r="180" fill="#6366F1" opacity="0.2" filter="url(#softGlow)" />
+  <circle cx="1000" cy="300" r="190" fill="#EC4899" opacity="0.18" filter="url(#softGlow)" />
+  <circle cx="600" cy="210" r="150" fill="#06B6D4" opacity="0.15" filter="url(#softGlow)" />
+
+  <!-- Tech Grid Overlay -->
+  <rect width="1200" height="420" fill="url(#grid)" />
+
+  <!-- Border Frame -->
+  <rect x="15" y="15" width="1170" height="390" rx="20" fill="none" stroke="#334155" stroke-width="1.5" stroke-opacity="0.4" />
+
+  <!-- Logo Mark Icon Center Top -->
+  <g transform="translate(600, 105)">
+    <!-- Outer Diamond Glow -->
+    <rect x="-42" y="-42" width="84" height="84" rx="22" transform="rotate(45)" fill="url(#primaryGrad)" filter="url(#glow)" opacity="0.4" />
+    <!-- Outer Card -->
+    <rect x="-38" y="-38" width="76" height="76" rx="20" transform="rotate(45)" fill="#0F172A" stroke="url(#primaryGrad)" stroke-width="2" />
+    <!-- Shopping Bag + Sparkle Icon -->
+    <path d="M -14 -6 L 14 -6 L 12 16 C 12 18 10 20 8 20 L -8 20 C -10 20 -12 18 -12 16 Z" fill="none" stroke="#F8FAFC" stroke-width="2.5" stroke-linejoin="round" />
+    <path d="M -7 -6 C -7 -14 7 -14 7 -6" fill="none" stroke="#F8FAFC" stroke-width="2.5" stroke-linecap="round" />
+    <circle cx="0" cy="6" r="2.5" fill="#38BDF8" />
+  </g>
+
+  <!-- Main Brand Title -->
+  <text x="600" y="225" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="56" font-weight="900" letter-spacing="-1.5">
+    <tspan fill="#FFFFFF">Shop</tspan><tspan fill="url(#primaryGrad)">Sphere</tspan>
+  </text>
+
+  <!-- Tagline Subtitle -->
+  <text x="600" y="270" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="500" fill="#94A3B8" letter-spacing="0.5">
+    Next-Generation Full-Stack MERN Luxury E-Commerce Platform
+  </text>
+
+  <!-- Feature Highlights / Badges Row -->
+  <g transform="translate(190, 315)">
+    <!-- Pill 1: React 19 & Vite -->
+    <g transform="translate(0, 0)">
+      <rect width="135" height="38" rx="19" fill="url(#cardGrad)" stroke="#38BDF8" stroke-width="1.2" stroke-opacity="0.6" />
+      <circle cx="20" cy="19" r="5" fill="#38BDF8" />
+      <text x="34" y="24" font-family="sans-serif" font-size="13" font-weight="600" fill="#E2E8F0">React 19 • Vite</text>
+    </g>
+
+    <!-- Pill 2: Tailwind v4 -->
+    <g transform="translate(150, 0)">
+      <rect width="155" height="38" rx="19" fill="url(#cardGrad)" stroke="#2DD4BF" stroke-width="1.2" stroke-opacity="0.6" />
+      <circle cx="20" cy="19" r="5" fill="#2DD4BF" />
+      <text x="34" y="24" font-family="sans-serif" font-size="13" font-weight="600" fill="#E2E8F0">Tailwind CSS v4</text>
+    </g>
+
+    <!-- Pill 3: Node & Express 5 -->
+    <g transform="translate(320, 0)">
+      <rect width="165" height="38" rx="19" fill="url(#cardGrad)" stroke="#22C55E" stroke-width="1.2" stroke-opacity="0.6" />
+      <circle cx="20" cy="19" r="5" fill="#22C55E" />
+      <text x="34" y="24" font-family="sans-serif" font-size="13" font-weight="600" fill="#E2E8F0">Node • Express 5</text>
+    </g>
+
+    <!-- Pill 4: MongoDB Atlas -->
+    <g transform="translate(500, 0)">
+      <rect width="150" height="38" rx="19" fill="url(#cardGrad)" stroke="#10B981" stroke-width="1.2" stroke-opacity="0.6" />
+      <circle cx="20" cy="19" r="5" fill="#10B981" />
+      <text x="34" y="24" font-family="sans-serif" font-size="13" font-weight="600" fill="#E2E8F0">MongoDB Atlas</text>
+    </g>
+
+    <!-- Pill 5: JWT & Admin Suite -->
+    <g transform="translate(665, 0)">
+      <rect width="155" height="38" rx="19" fill="url(#cardGrad)" stroke="#F43F5E" stroke-width="1.2" stroke-opacity="0.6" />
+      <circle cx="20" cy="19" r="5" fill="#F43F5E" />
+      <text x="34" y="24" font-family="sans-serif" font-size="13" font-weight="600" fill="#E2E8F0">Admin Dashboard</text>
+    </g>
+  </g>
+</svg>
